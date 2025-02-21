@@ -3,11 +3,13 @@ from time import sleep
 from tkinter import ttk, filedialog, scrolledtext, messagebox
 import serial
 import serial.tools.list_ports
+import struct
 import threading
 import queue
 import time
 
 opcode_list = {"update": 1, "reboot": 2, "commit update": 3}
+
 
 class FirmwareUpdaterApp(tk.Tk):
     def __init__(self):
@@ -32,6 +34,20 @@ class FirmwareUpdaterApp(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def create_widgets(self):
+
+        self.main_frame = ttk.Frame(self)
+        self.main_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+        # FRAME LATERAL ESQUERDA (Zona de Informações)
+        self.info_frame = ttk.Frame(self, width=200, relief=tk.SUNKEN, borderwidth=2)
+        self.info_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
+
+        ttk.Label(self.info_frame, text="Informações", font=("Arial", 12, "bold")).pack(pady=5)
+
+        # Temperatura
+        self.temp_label = ttk.Label(self.info_frame, text="Temperatura: -- °C", font=("Arial", 10))
+        self.temp_label.pack(pady=5)
+
         # Serial port selection
         self.port_frame = ttk.Frame(self)
         self.port_frame.pack(pady=5)
@@ -106,7 +122,10 @@ class FirmwareUpdaterApp(tk.Tk):
             try:
                 msg = self.queue.get_nowait()
                 if msg['type'] == 'log':
-                    self.log(msg['message'])
+                    self.log_area.insert(tk.END, msg['message'] + "\n")
+                    self.log_area.see(tk.END)
+                elif msg['type'] == 'update_ui':
+                    self.temp_label.config(text=f"Temperatura: {msg['temp']} °C")
             except queue.Empty:
                 pass
         self.after(10, self.process_queue)
@@ -140,16 +159,70 @@ class FirmwareUpdaterApp(tk.Tk):
     def read_serial(self):
         while self.running and self.ser and self.ser.is_open:
             try:
+
                 if self.ser.in_waiting > 0:
                     response = self.ser.readline().decode('utf-8', errors='ignore').strip()
-                    if response:
-                        self.queue.put({'type': 'log', 'message': f"<<< {response}"})
-                    if "rebooting..." in response:
-                        self.disconnect_serial()
-                        sleep(2)
-                        self.connect_serial()
-            except:
-                break
+
+                    # Ignore debug messages, but log them
+                    if response.startswith("DEBUG:"):
+                        debug_message = response[6:].strip()
+                        self.queue.put({'type': 'log', 'message': f" Debug: {debug_message}"})  # Send to GUI log
+                        print(f" Debug Message: {response[6:].strip()}")
+                        continue
+
+                if self.ser.in_waiting >= 16:
+                    data = self.ser.read(16)
+                    # Ensure we read exactly 16 bytes (full OpCodePacket size)
+                    if len(data) != 16:
+                        print("⚠ Incomplete packet received, ignoring...")
+                        error_count += 1
+                        if error_count > 10:  # Too many errors? Reset.
+                            print("⚠ Too many errors! Resetting serial connection...")
+                            self.ser.close()
+                            time.sleep(2)
+                            self.connect_serial()
+                            error_count = 0  # Reset error counter
+                        continue
+
+                    # Unpack header fields
+                    sync_word, packet_type, command_code, payload_length = struct.unpack("<H B B B", data[:5])
+
+                    # Validate Sync Word
+                    if sync_word != 0xA55A:
+                        print("⚠ Invalid packet received (Sync Word mismatch)")
+                        continue  # Ignore this packet
+
+                    # Extract temperature
+                    payload = data[5:13]
+                    temp_celsius = struct.unpack("<f", payload[:4])[0]
+
+                    # Validate checksum
+                    checksum_received = data[13]
+                    checksum_calculated = self.calculate_checksum(data)
+
+                    if checksum_received != checksum_calculated:
+                        print(f"⚠ Checksum mismatch! Received {checksum_received}, Expected {checksum_calculated}")
+                        continue  # Ignore corrupted packet
+
+                    # Update UI with valid temperature data
+                    self.queue.put({
+                        'type': 'update_ui',
+                        'temp': round(temp_celsius, 2)
+                    })
+
+                    print(f"✅ Received Temp: {temp_celsius:.2f}°C")
+
+            except serial.SerialException as e:
+                print(f"⚠ Serial Error: {e}")
+                self.ser.close()
+                time.sleep(2)
+                self.connect_serial()
+
+    def calculate_checksum(self, packet):
+        checksum = 0
+        for byte in packet[:-3]:  # XOR all bytes except last 3 (checksum + end marker)
+            checksum ^= byte
+        return checksum
 
     def send_serial_input(self, text = ""):
         print(text)
@@ -222,6 +295,8 @@ class FirmwareUpdaterApp(tk.Tk):
 
         except Exception as e:
             self.queue.put({'type': 'log', 'message': f"Reconnection failed: {str(e)}"})
+
+
 
 
 if __name__ == "__main__":
