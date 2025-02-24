@@ -9,7 +9,7 @@ import time
 
 opcode_list = {"update": 1, "reboot": 2, "commit update": 3}
 
-class FirmwareUpdaterApp(tk.Tk):
+class FirmwareUpdaterAppOld(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Firmware Updater")
@@ -34,50 +34,6 @@ class FirmwareUpdaterApp(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def create_widgets(self):
-        # Create a notebook (tabbed interface)
-        self.notebook = ttk.Notebook(self)
-        self.notebook.pack(fill=tk.BOTH, expand=True)
-
-        # Tab 1: Console Logs
-        self.console_tab = ttk.Frame(self.notebook)
-        self.notebook.add(self.console_tab, text="Console Logs")
-
-        # Log display
-        self.log_area = scrolledtext.ScrolledText(self.console_tab, wrap=tk.WORD)
-        self.log_area.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-
-        # Input frame for sending strings in the Console Logs tab
-        self.console_input_frame = ttk.Frame(self.console_tab)
-        self.console_input_frame.pack(fill=tk.X, padx=5, pady=5)
-
-        ttk.Label(self.console_input_frame, text="Send:").pack(side=tk.LEFT)
-        self.console_input_entry = ttk.Entry(self.console_input_frame, width=50)
-        self.console_input_entry.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
-        self.console_input_entry.bind("<Return>", self.send_serial_input)
-        self.console_input_entry.bind("<Up>", self.show_previous_command)
-        self.console_input_entry.bind("<Down>", self.show_next_command)
-
-        self.console_send_btn = ttk.Button(self.console_input_frame, text="Send", command=self.send_serial_input)
-        self.console_send_btn.pack(side=tk.LEFT)
-
-        # Tab 2: Command Sender
-        self.command_tab = ttk.Frame(self.notebook)
-        self.notebook.add(self.command_tab, text="Command Sender")
-
-        # Command input frame
-        self.command_input_frame = ttk.Frame(self.command_tab)
-        self.command_input_frame.pack(fill=tk.X, padx=5, pady=5)
-
-        ttk.Label(self.command_input_frame, text="Command:").pack(side=tk.LEFT)
-        self.command_entry = ttk.Entry(self.command_input_frame, width=50)
-        self.command_entry.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
-        self.command_entry.bind("<Return>", self.send_command)
-        self.command_entry.bind("<Up>", self.show_previous_command)
-        self.command_entry.bind("<Down>", self.show_next_command)
-
-        self.send_command_btn = ttk.Button(self.command_input_frame, text="Send", command=self.send_command)
-        self.send_command_btn.pack(side=tk.LEFT)
-
         # Serial port selection
         self.port_frame = ttk.Frame(self)
         self.port_frame.pack(pady=5)
@@ -103,6 +59,24 @@ class FirmwareUpdaterApp(tk.Tk):
         self.browse_btn = ttk.Button(self.file_frame, text="Browse", command=self.browse_file)
         self.browse_btn.pack(side=tk.LEFT, padx=5)
 
+        # Log display
+        self.log_area = scrolledtext.ScrolledText(self, wrap=tk.WORD)
+        self.log_area.pack(pady=10, fill=tk.BOTH, expand=True)
+
+        # Serial input prompt
+        self.input_frame = ttk.Frame(self)
+        self.input_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        ttk.Label(self.input_frame, text="Send:").pack(side=tk.LEFT)
+        self.input_entry = ttk.Entry(self.input_frame, width=50)
+        self.input_entry.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        self.input_entry.bind("<Return>", self.send_serial_input)
+        self.input_entry.bind("<Up>", self.show_previous_command)
+        self.input_entry.bind("<Down>", self.show_next_command)
+
+        self.send_btn = ttk.Button(self.input_frame, text="Send", command=self.send_serial_input)
+        self.send_btn.pack(side=tk.LEFT)
+
         # Control buttons
         self.control_frame = ttk.Frame(self)
         self.control_frame.pack(pady=5)
@@ -114,49 +88,33 @@ class FirmwareUpdaterApp(tk.Tk):
         self.reboot_btn = ttk.Button(self.control_frame, text="Reboot", command=self.send_serial_input("4"))
         self.reboot_btn.pack(side=tk.LEFT, padx=5)
 
+
     def send_serial_input(self, event=None):
-        """Send a string from the Console Logs tab."""
         if self.ser and self.ser.is_open:
-            text = self.console_input_entry.get().strip()
+            text = self.input_entry.get().strip()
             if text:
                 self.ser.write((text + '\n').encode())
                 self.log(f">>> {text}")
                 self.command_history.append(text)  # Store command
                 self.history_index = len(self.command_history)  # Reset index
-                self.console_input_entry.delete(0, tk.END)
-
-    def send_command(self, event=None):
-        """Send a command from the Command Sender tab."""
-        if self.ser and self.ser.is_open:
-            command = self.command_entry.get().strip()
-            if command:
-                self.ser.write((command + '\n').encode())
-                self.log(f">>> {command}")
-                self.command_history.append(command)  # Store command
-                self.history_index = len(self.command_history)  # Reset index
-                self.command_entry.delete(0, tk.END)
+                self.input_entry.delete(0, tk.END)
 
     def show_previous_command(self, event):
         """Navigate up in command history."""
         if self.command_history and self.history_index > 0:
             self.history_index -= 1
-            self.console_input_entry.delete(0, tk.END)
-            self.console_input_entry.insert(0, self.command_history[self.history_index])
-            self.command_entry.delete(0, tk.END)
-            self.command_entry.insert(0, self.command_history[self.history_index])
+            self.input_entry.delete(0, tk.END)
+            self.input_entry.insert(0, self.command_history[self.history_index])
 
     def show_next_command(self, event):
         """Navigate down in command history."""
         if self.command_history and self.history_index < len(self.command_history) - 1:
             self.history_index += 1
-            self.console_input_entry.delete(0, tk.END)
-            self.console_input_entry.insert(0, self.command_history[self.history_index])
-            self.command_entry.delete(0, tk.END)
-            self.command_entry.insert(0, self.command_history[self.history_index])
+            self.input_entry.delete(0, tk.END)
+            self.input_entry.insert(0, self.command_history[self.history_index])
         else:
             self.history_index = len(self.command_history)  # Reset index
-            self.console_input_entry.delete(0, tk.END)  # Clear input field
-            self.command_entry.delete(0, tk.END)  # Clear input field
+            self.input_entry.delete(0, tk.END)  # Clear input field
 
     def refresh_ports(self):
         ports = [f"{p.device} - {p.description}" for p in serial.tools.list_ports.comports()]
@@ -186,6 +144,12 @@ class FirmwareUpdaterApp(tk.Tk):
         self.after(10, self.process_queue)
 
     def connect_serial(self):
+        '''
+        if self.ser and self.ser.is_open:
+            self.log("Already connected to serial port.")
+            return
+        '''
+
         port = self.port_combo.get().split(' - ')[0]
         if not port:
             messagebox.showerror("Error", "Please select a serial port")
@@ -282,5 +246,5 @@ class FirmwareUpdaterApp(tk.Tk):
 
 
 if __name__ == "__main__":
-    app = FirmwareUpdaterApp()
+    app = FirmwareUpdaterAppOld()
     app.mainloop()
