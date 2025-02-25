@@ -38,18 +38,14 @@ class SerialCommunication:
 
     def send_data(self, packet):
         if self.ser and self.ser.is_open:
-            if packet:
-                self.ser.write(packet)
-                return f"Sent: {packet}"
-            return "No data to send."
-        raise ValueError("Not connected to serial port")
+            print("here")
+            self.ser.write(packet)
 
     def send_serial_input(self, input_data, encoding='utf-8'):
         """Send data to the serial port."""
         if self.ser and self.ser.is_open:
             if input_data:
-                encoded_data = input_data.encode(encoding)
-                self.ser.write(encoded_data)
+                self.ser.write((input_data + '\n').encode(encoding))
                 return f"Sent: {input_data}"
             return "No data to send."
         raise ValueError("Not connected to serial port")
@@ -60,7 +56,8 @@ class SerialCommunication:
             try:
                 if self.ser.in_waiting > 0:
                     response = self.ser.readline().decode('utf-8', errors='ignore').strip()
-                    self.log_to_console(f"<<< {response}")
+                    if response:
+                        self.log_to_console(f"<<< {response}")
             except Exception as e:
                 raise IOError(f"Error reading from serial: {str(e)}")
 

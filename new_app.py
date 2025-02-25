@@ -5,6 +5,7 @@ from serial_ui import SerialUI
 from consoleUI import ConsoleUI
 from console import Console
 from opcodeUi import OpcodeUI
+from updateUi import UpdaterUI
 
 class FirmwareUpdaterApp(tk.Tk):
     def __init__(self):
@@ -47,8 +48,8 @@ class FirmwareUpdaterApp(tk.Tk):
 
         # Tab 1 (Mockup)
         self.tab1 = ttk.Frame(self.notebook)
-        self.notebook.add(self.tab1, text="Tab 1")
-        ttk.Label(self.tab1, text="This is a mockup tab").pack(pady=20)
+        self.notebook.add(self.tab1, text="Firmware Update")
+        self.updater_ui = UpdaterUI(self.tab1, self.serial_comm, self.console)
 
         # Tab 2 (Mockup)
         self.tab2 = ttk.Frame(self.notebook)

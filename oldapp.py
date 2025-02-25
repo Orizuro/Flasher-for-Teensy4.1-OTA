@@ -9,7 +9,7 @@ import time
 
 opcode_list = {"update": 1, "reboot": 2, "commit update": 3}
 
-class FirmwareUpdaterAppOld(tk.Tk):
+class FirmwareUpdaterApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Firmware Updater")
@@ -20,8 +20,6 @@ class FirmwareUpdaterAppOld(tk.Tk):
         self.running = False
         self.queue = queue.Queue()
         self.confirm_lines = None
-        self.command_history = []  # Stores sent commands
-        self.history_index = -1  # Tracks history position
 
         # Create UI elements
         self.create_widgets()
@@ -71,8 +69,6 @@ class FirmwareUpdaterAppOld(tk.Tk):
         self.input_entry = ttk.Entry(self.input_frame, width=50)
         self.input_entry.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
         self.input_entry.bind("<Return>", self.send_serial_input)
-        self.input_entry.bind("<Up>", self.show_previous_command)
-        self.input_entry.bind("<Down>", self.show_next_command)
 
         self.send_btn = ttk.Button(self.input_frame, text="Send", command=self.send_serial_input)
         self.send_btn.pack(side=tk.LEFT)
@@ -87,34 +83,6 @@ class FirmwareUpdaterAppOld(tk.Tk):
 
         self.reboot_btn = ttk.Button(self.control_frame, text="Reboot", command=self.send_serial_input("4"))
         self.reboot_btn.pack(side=tk.LEFT, padx=5)
-
-
-    def send_serial_input(self, event=None):
-        if self.ser and self.ser.is_open:
-            text = self.input_entry.get().strip()
-            if text:
-                self.ser.write((text + '\n').encode())
-                self.log(f">>> {text}")
-                self.command_history.append(text)  # Store command
-                self.history_index = len(self.command_history)  # Reset index
-                self.input_entry.delete(0, tk.END)
-
-    def show_previous_command(self, event):
-        """Navigate up in command history."""
-        if self.command_history and self.history_index > 0:
-            self.history_index -= 1
-            self.input_entry.delete(0, tk.END)
-            self.input_entry.insert(0, self.command_history[self.history_index])
-
-    def show_next_command(self, event):
-        """Navigate down in command history."""
-        if self.command_history and self.history_index < len(self.command_history) - 1:
-            self.history_index += 1
-            self.input_entry.delete(0, tk.END)
-            self.input_entry.insert(0, self.command_history[self.history_index])
-        else:
-            self.history_index = len(self.command_history)  # Reset index
-            self.input_entry.delete(0, tk.END)  # Clear input field
 
     def refresh_ports(self):
         ports = [f"{p.device} - {p.description}" for p in serial.tools.list_ports.comports()]
@@ -183,6 +151,17 @@ class FirmwareUpdaterAppOld(tk.Tk):
             except:
                 break
 
+    def send_serial_input(self, text = ""):
+        print(text)
+        if self.ser and self.ser.is_open:
+            if text == "":
+                text = self.input_entry.get()
+            if text:
+                self.ser.write((text + '\n').encode())
+                self.log(f">>> {text}")
+                self.input_entry.delete(0, tk.END)
+
+
     def disconnect_serial(self):
         if self.ser and self.ser.is_open:
             self.ser.close()
@@ -246,5 +225,5 @@ class FirmwareUpdaterAppOld(tk.Tk):
 
 
 if __name__ == "__main__":
-    app = FirmwareUpdaterAppOld()
+    app = FirmwareUpdaterApp()
     app.mainloop()
