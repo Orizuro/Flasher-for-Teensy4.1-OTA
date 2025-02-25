@@ -36,6 +36,14 @@ class SerialCommunication:
             return "Serial port disconnected."
         return "No active connection to disconnect."
 
+    def send_data(self, packet):
+        if self.ser and self.ser.is_open:
+            if packet:
+                self.ser.write(packet)
+                return f"Sent: {packet}"
+            return "No data to send."
+        raise ValueError("Not connected to serial port")
+
     def send_serial_input(self, input_data, encoding='utf-8'):
         """Send data to the serial port."""
         if self.ser and self.ser.is_open:
